@@ -16,10 +16,17 @@ async function register(req, res, next) {
   try {
     const { username, email, password, role, name, tenantId } = req.body
 
-    // Check if user already exists
-    const existingUser = await User.findOne({
+    // Check if user already exists (scoped by tenant if in tenant context, or globally for standalone)
+    const existingUserQuery = {
       $or: [{ email: email }, { username: username }],
-    })
+    }
+    if (tenantId) {
+      existingUserQuery.$or = [
+        { email, tenantId },
+        { username, tenantId },
+      ]
+    }
+    const existingUser = await User.findOne(existingUserQuery)
 
     if (existingUser) {
       if (existingUser.email === email) {

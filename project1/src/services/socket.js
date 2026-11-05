@@ -71,6 +71,14 @@ export function disconnectSocket() {
   }
 }
 
+// Function to retrieve current socket or initialize it
+export function getSocket() {
+  if (!socket) {
+    return connectSocket()
+  }
+  return socket
+}
+
 // Helper to join a specific auction room
 export function joinAuctionRoom(auctionId) {
   if (socket) {
@@ -106,4 +114,5 @@ export default {
   leaveAuctionRoom,
   joinAdminRoom,
   leaveAdminRoom,
+  getSocket,
 }

@@ -11,15 +11,20 @@ function Header(props) {
 	const [showBeginnerGuide, setShowBeginnerGuide] = useState(false)
 	const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
 	const location = useLocation()
-	const { isDark, toggleTheme } = useTheme()
+	const { isDark, toggleTheme, tenantBranding } = useTheme()
 
   return (
     <header className="bg-white dark:bg-black shadow-lg dark:shadow-none sticky top-0 z-50 transition-colors duration-200 dark:border-b dark:border-gray-800">
       <div className="container mx-auto px-4 py-3">
         <div className="flex justify-between items-center">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          {/* Logo & Tenant Brand */}
+          <Link to="/" className="flex items-center space-x-3">
             <span className="text-2xl sm:text-3xl font-serif text-gray-900 dark:text-white tracking-tight">BidMaster</span>
+            {tenantBranding && tenantBranding.name && tenantBranding.subdomain !== 'default' && (
+              <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider bg-tenant-primary text-black">
+                {tenantBranding.name}
+              </span>
+            )}
           </Link>
 
           {/* Navigation */}

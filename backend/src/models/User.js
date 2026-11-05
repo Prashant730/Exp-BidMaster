@@ -110,9 +110,11 @@ const userSchema = new mongoose.Schema(
   }
 )
 
-// Index for faster queries (email and username already indexed via unique: true)
+// Index for faster queries
 userSchema.index({ sellerStatus: 1 })
 userSchema.index({ status: 1 })
+userSchema.index({ tenantId: 1, email: 1 })
+userSchema.index({ tenantId: 1, username: 1 })
 
 // Hash password before saving
 userSchema.pre('save', async function (next) {
