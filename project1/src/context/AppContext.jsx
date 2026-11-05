@@ -55,12 +55,41 @@ export function AppProvider({ children, initialAuctions = [], initialUsers = [],
     }
   }
 
+  const [outbidAlert, setOutbidAlert] = useState(null)
+
+  // Play subtle real-time audio chime on new bids or outbids
+  function playBidChime(isOutbid = false) {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return
+      const ctx = new AudioContext()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.setValueAtTime(isOutbid ? 300 : 587.33, ctx.currentTime) // D5 or lower for outbid
+      if (!isOutbid) {
+        osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15) // A5
+      } else {
+        osc.frequency.exponentialRampToValueAtTime(220, ctx.currentTime + 0.25)
+      }
+      gain.gain.setValueAtTime(0.08, ctx.currentTime)
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start()
+      osc.stop(ctx.currentTime + 0.3)
+    } catch (e) {
+      // Audio not permitted without interaction or unsupported
+    }
+  }
+
   // Socket event handlers
   useEffect(() => {
     loadAuctionsFromDB()
     const socket = getSocket()
 
     socket.on('bidUpdate', (data) => {
+      playBidChime(false)
       setAuctions(prev => prev.map(auction => {
         const auctionId = auction._id || auction.id
         if (auctionId === data.auctionId) {
@@ -80,6 +109,32 @@ export function AppProvider({ children, initialAuctions = [], initialUsers = [],
     })
 
     socket.on('bidPlaced', (data) => {
+      playBidChime(false)
+
+      // Check if current logged-in user was outbid
+      const currentStoredUser = localStorage.getItem('user')
+      if (currentStoredUser) {
+        try {
+          const parsed = JSON.parse(currentStoredUser)
+          const currentUserId = parsed.id || parsed._id
+          if (
+            data.previousHighestBidderId &&
+            data.previousHighestBidderId.toString() === currentUserId.toString() &&
+            data.bidderId?.toString() !== currentUserId.toString()
+          ) {
+            playBidChime(true)
+            setOutbidAlert({
+              auctionId: data.auctionId,
+              auctionTitle: data.auctionTitle || 'an item you bid on',
+              newPrice: data.amount,
+              suggestedBid: data.amount + 50,
+            })
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
       setAuctions(prev => prev.map(auction => {
         const auctionId = auction._id || auction.id
         if (auctionId === data.auctionId) {
@@ -88,6 +143,7 @@ export function AppProvider({ children, initialAuctions = [], initialUsers = [],
             currentPrice: data.amount,
             bids: [...auction.bids, {
               bidder: data.bidderName,
+              bidderId: data.bidderId,
               amount: data.amount,
               time: new Date(data.timestamp || Date.now())
             }]
@@ -305,7 +361,8 @@ export function AppProvider({ children, initialAuctions = [], initialUsers = [],
     commissionRate, setCommissionRate: updateCommissionRateValue,
     updateAuction, removeAuction, updateUser,
     placeBid, addUser, deleteUser, createAuction,
-    loadAuctionsFromDB, loading
+    loadAuctionsFromDB, loading,
+    outbidAlert, setOutbidAlert, playBidChime,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

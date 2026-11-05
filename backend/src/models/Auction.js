@@ -92,6 +92,28 @@ const auctionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    autoBids: [
+      {
+        bidderId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User',
+          required: true,
+        },
+        bidderName: {
+          type: String,
+          required: true,
+        },
+        maxBid: {
+          type: Number,
+          required: true,
+          min: 0,
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     bids: [bidSchema],
   },
   {

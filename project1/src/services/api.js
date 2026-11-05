@@ -125,6 +125,10 @@ export const auctionsAPI = {
   placeBid: function (id, amount) {
     return api.post('/auctions/' + id + '/bid', { amount: amount })
   },
+  // Set proxy auto-bid on an auction
+  setAutoBid: function (id, maxBid) {
+    return api.post('/auctions/' + id + '/auto-bid', { maxBid: maxBid })
+  },
   // Get all auctions created by a specific user
   getUserAuctions: function (userId) {
     return api.get('/auctions/user/' + userId)

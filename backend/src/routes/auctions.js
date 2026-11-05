@@ -8,6 +8,7 @@ const {
   updateAuction,
   deleteAuction,
   placeBid,
+  setAutoBid,
   removeBid,
   getUserAuctions,
 } = require('../controllers/auctionController')
@@ -118,6 +119,22 @@ router.post(
   ],
   validate,
   placeBid
+)
+
+// @route   POST /api/auctions/:id/auto-bid
+// @desc    Configure proxy auto-bidding
+// @access  Authenticated (non-admin)
+router.post(
+  '/:id/auto-bid',
+  protect,
+  isNotAdmin,
+  [
+    body('maxBid')
+      .isFloat({ min: 0 })
+      .withMessage('Max bid amount must be a positive number'),
+  ],
+  validate,
+  setAutoBid
 )
 
 // @route   DELETE /api/auctions/:id/bid/:bidId

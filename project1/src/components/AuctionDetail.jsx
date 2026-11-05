@@ -70,6 +70,42 @@ function AuctionDetail(props) {
   const [timeLeft, setTimeLeft] = useState({})
   const [showBidSuccess, setShowBidSuccess] = useState(false)
   const [isAuctionEnded, setIsAuctionEnded] = useState(false)
+  const [autoBidMax, setAutoBidMax] = useState('')
+  const [autoBidLoading, setAutoBidLoading] = useState(false)
+  const [autoBidSuccess, setAutoBidSuccess] = useState('')
+
+  async function handleSetAutoBid(e) {
+    e.preventDefault()
+    if (!user) {
+      alert('Please log in to set an auto-bid')
+      return
+    }
+    if (user.isAdmin) {
+      alert('Admins cannot set auto-bids')
+      return
+    }
+    const max = parseFloat(autoBidMax)
+    if (isNaN(max) || max <= auction.currentPrice) {
+      alert(`Max auto-bid must be higher than current price of ₹${auction.currentPrice}`)
+      return
+    }
+
+    try {
+      setAutoBidLoading(true)
+      const res = await auctionsAPI.setAutoBid(auction._id || auction.id, max)
+      if (res.data?.success) {
+        setAutoBidSuccess(`Auto-Bid active! BidMaster will automatically bid for you up to ₹${max.toLocaleString()}`)
+        setAutoBidMax('')
+        await refreshAuction()
+      } else {
+        alert(res.data?.message || 'Failed to set auto-bid')
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to set auto-bid')
+    } finally {
+      setAutoBidLoading(false)
+    }
+  }
 
   function calculateTimeLeft() {
     if (!auction) return {}
@@ -362,31 +398,67 @@ function AuctionDetail(props) {
                 </div>
               </div>
 
-              {/* Bid Form */}
+              {/* Bid Form & Proxy Auto-Bidding */}
               {!isAuctionEnded ? (
-                <form onSubmit={handlePlaceBid} className="space-y-3 sm:space-y-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-yellow-400 mb-2">Enter Your Bid</label>
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <div className="space-y-6">
+                  {/* Direct Bid */}
+                  <form onSubmit={handlePlaceBid} className="space-y-3 sm:space-y-4">
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-yellow-400">Direct Bid</label>
+                        <span className="text-xs text-gray-400">Instant Execution</span>
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                        <input
+                          type="number"
+                          value={bidAmount}
+                          onChange={(e) => setBidAmount(e.target.value)}
+                          placeholder={`Minimum ₹${(auction.currentPrice + 100).toLocaleString()}`}
+                          className="flex-1 border border-gray-300 dark:border-yellow-600 dark:bg-black dark:text-yellow-400 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base text-gray-900 placeholder-gray-500 dark:placeholder-yellow-600 focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent"
+                          min={auction.currentPrice + 100}
+                          step="100"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!user || (user && user.isAdmin) || bidLoading}
+                          className="w-full sm:w-auto bg-black dark:bg-[#1a1918] hover:bg-gray-900 dark:hover:bg-black text-[#c3a372] px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-bold text-sm sm:text-base transition-all duration-200 transform hover:scale-105 shadow-lg dark:shadow-yellow-500/30"
+                        >
+                          {bidLoading ? 'Placing Bid...' : (user ? (user.isAdmin ? 'Admins cannot bid' : 'Place Bid') : 'Login to Bid')}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+
+                  {/* Auto-Bid / Proxy Bid Setup */}
+                  <div className="border-t border-gray-200 dark:border-[#2a2825] pt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs sm:text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+                        <span className="text-[#c3a372]">🤖</span> Auto-Bid (Proxy Bidding)
+                      </span>
+                      <span className="text-[11px] text-gray-400">BidMaster bids on your behalf</span>
+                    </div>
+                    <form onSubmit={handleSetAutoBid} className="flex flex-col sm:flex-row gap-3">
                       <input
                         type="number"
-                        value={bidAmount}
-                        onChange={(e) => setBidAmount(e.target.value)}
-                        placeholder={`Minimum ₹${(auction.currentPrice + 100).toLocaleString()}`}
-                        className="flex-1 border border-gray-300 dark:border-yellow-600 dark:bg-black dark:text-yellow-400 rounded-lg px-3 sm:px-4 py-2 sm:py-3 text-sm sm:text-base text-gray-900 placeholder-gray-500 dark:placeholder-yellow-600 focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white focus:border-transparent"
+                        value={autoBidMax}
+                        onChange={(e) => setAutoBidMax(e.target.value)}
+                        placeholder="Your Maximum Budget (e.g. ₹5,000)"
+                        className="flex-1 border border-gray-300 dark:border-[#3a352e] dark:bg-[#121110] dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#c3a372]"
                         min={auction.currentPrice + 100}
-                        step="100"
                       />
                       <button
                         type="submit"
-                        disabled={!user || (user && user.isAdmin) || bidLoading}
-                        className="w-full sm:w-auto bg-black dark:bg-[#1a1918] hover:bg-gray-900 dark:hover:bg-black text-[#c3a372] px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg font-bold text-sm sm:text-base transition-all duration-200 transform hover:scale-105 shadow-lg dark:shadow-yellow-500/30"
+                        disabled={!user || (user && user.isAdmin) || autoBidLoading}
+                        className="bg-[#c3a372] text-black font-semibold px-4 py-2 rounded-lg text-sm hover:bg-[#d8b885] transition-colors disabled:opacity-50 whitespace-nowrap"
                       >
-                        {bidLoading ? 'Placing Bid...' : (user ? (user.isAdmin ? 'Admins cannot bid' : 'Place Bid') : 'Login to Bid')}
+                        {autoBidLoading ? 'Setting...' : 'Set Auto-Bid'}
                       </button>
-                    </div>
+                    </form>
+                    {autoBidSuccess && (
+                      <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-medium">✓ {autoBidSuccess}</p>
+                    )}
                   </div>
-                </form>
+                </div>
               ) : (
                 <div className="bg-gray-100 dark:bg-yellow-500/10 dark:border dark:border-yellow-600/50 rounded-lg p-3 sm:p-4 text-center">
                   <p className="text-gray-600 dark:text-yellow-400 font-medium text-sm sm:text-base">This auction has ended</p>

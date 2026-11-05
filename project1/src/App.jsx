@@ -54,6 +54,9 @@ function AppContent() {
   const removeAuction = appContext.removeAuction
   const addUser = appContext.addUser
   const createAuction = appContext.createAuction
+  const outbidAlert = appContext.outbidAlert
+  const setOutbidAlert = appContext.setOutbidAlert
+  const placeBid = appContext.placeBid
 
   const { user: authUser, logout } = useAuth()
   const [showLogin, setShowLogin] = useState(false)
@@ -177,6 +180,48 @@ function AppContent() {
         </Routes>
 
         {showLogin && <LoginModal onClose={() => setShowLogin(false)} onLogin={handleLogin} />}
+
+        {/* Global Outbid Notification Floating Toast with Instant 1-Click Re-Bid */}
+        {outbidAlert && (
+          <div className="fixed bottom-6 right-6 z-50 bg-[#1a1816] border-2 border-[#b95757] text-white p-4 rounded-lg shadow-2xl max-w-sm animate-bounce">
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⚠️</span>
+                <span className="font-bold text-sm text-[#e4a0a0]">You were outbid!</span>
+              </div>
+              <button
+                onClick={() => setOutbidAlert(null)}
+                className="text-gray-400 hover:text-white text-xs font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-xs text-gray-300 mb-3">
+              Someone outbid you on <span className="text-[#c3a372] font-semibold">{outbidAlert.auctionTitle}</span>. Current highest: <span className="font-bold">₹{outbidAlert.newPrice.toLocaleString()}</span>.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  if (!user) return
+                  await placeBid(outbidAlert.auctionId, {
+                    amount: outbidAlert.suggestedBid,
+                    bidderName: user.name || user.username,
+                  })
+                  setOutbidAlert(null)
+                }}
+                className="flex-1 bg-[#c3a372] hover:bg-[#d8b885] text-black font-bold text-xs py-2 px-3 rounded shadow transition-transform active:scale-95 text-center"
+              >
+                ⚡ Counter-Bid ₹{outbidAlert.suggestedBid.toLocaleString()}
+              </button>
+              <button
+                onClick={() => setOutbidAlert(null)}
+                className="bg-black/50 hover:bg-black text-gray-300 text-xs py-2 px-3 rounded border border-gray-700"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </Router>
   )

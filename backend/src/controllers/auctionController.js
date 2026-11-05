@@ -190,21 +190,46 @@ async function placeBid(req, res, next) {
       })
     }
 
-    const { auction, bid } = await auctionService.placeBid(
+    const { auction, previousHighestBid } = await auctionService.placeBid(
       req.params.id,
-      parseFloat(amount),
-      req.user
+      req.user._id,
+      req.user.name || req.user.username,
+      parseFloat(amount)
     )
+
+    const latestBid = auction.bids[auction.bids.length - 1]
+
+    // Real-time socket broadcast with outbid details
+    try {
+      const io = getIO()
+      const tenantRoom = auction.tenantId ? `tenant_${auction.tenantId}` : 'tenant_global'
+      const payload = {
+        auctionId: auction._id,
+        auctionTitle: auction.title,
+        amount: auction.currentPrice,
+        newPrice: auction.currentPrice,
+        bidderName: latestBid.bidderName,
+        bidderId: latestBid.bidderId,
+        timestamp: latestBid.timestamp,
+        tenantId: auction.tenantId,
+        previousHighestBidderId: previousHighestBid ? previousHighestBid.bidderId : null,
+      }
+      io.to(tenantRoom).emit('bidPlaced', payload)
+      io.to('auction_' + auction._id).emit('bidPlaced', payload)
+      io.emit('bidPlaced', payload) // global broadcast
+    } catch (socketErr) {
+      // socket not initialized in test mode
+    }
 
     // Log activity
     await logAndEmitActivity({
       type: 'bid',
-      message: `Bid of $${bid.amount} placed on ${auction.title}`,
+      message: `Bid of $${latestBid.amount} placed on ${auction.title}`,
       userId: req.user._id,
       userName: req.user.username,
       auctionId: auction._id,
       auctionTitle: auction.title,
-      amount: bid.amount,
+      amount: latestBid.amount,
       tenantId: auction.tenantId,
     })
 
@@ -212,8 +237,62 @@ async function placeBid(req, res, next) {
       success: true,
       data: {
         auction,
-        bid,
+        bid: latestBid,
       },
+    })
+  } catch (error) {
+    next(error)
+  }
+}
+
+// @desc    Set or update Auto-Bid (Proxy Bidding)
+// @route   POST /api/auctions/:id/auto-bid
+// @access  Bidder
+async function setAutoBid(req, res, next) {
+  try {
+    const { maxBid } = req.body
+
+    if (!maxBid || isNaN(maxBid)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid max bid amount',
+      })
+    }
+
+    const auction = await auctionService.setAutoBid(
+      req.params.id,
+      req.user._id,
+      req.user.name || req.user.username,
+      parseFloat(maxBid)
+    )
+
+    const latestBid = auction.bids[auction.bids.length - 1]
+
+    // Real-time socket broadcast
+    try {
+      const io = getIO()
+      const tenantRoom = auction.tenantId ? `tenant_${auction.tenantId}` : 'tenant_global'
+      const payload = {
+        auctionId: auction._id,
+        auctionTitle: auction.title,
+        amount: auction.currentPrice,
+        newPrice: auction.currentPrice,
+        bidderName: latestBid ? latestBid.bidderName : req.user.name,
+        bidderId: latestBid ? latestBid.bidderId : req.user._id,
+        timestamp: latestBid ? latestBid.timestamp : new Date(),
+        tenantId: auction.tenantId,
+      }
+      io.to(tenantRoom).emit('bidPlaced', payload)
+      io.to('auction_' + auction._id).emit('bidPlaced', payload)
+      io.emit('bidPlaced', payload)
+    } catch (socketErr) {
+      // socket not initialized
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Auto-bid set up to $${maxBid}`,
+      data: auction,
     })
   } catch (error) {
     next(error)
@@ -275,6 +354,7 @@ module.exports = {
   updateAuction,
   deleteAuction,
   placeBid,
+  setAutoBid,
   removeBid,
   getUserAuctions,
 }

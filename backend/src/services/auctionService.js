@@ -116,7 +116,16 @@ async function deleteAuction(id) {
   return result
 }
 
-// Place a bid on an auction
+// Calculate standard bid increment based on current price
+function calculateMinimumIncrement(currentPrice) {
+  if (currentPrice < 100) return 5
+  if (currentPrice < 500) return 10
+  if (currentPrice < 2000) return 25
+  if (currentPrice < 10000) return 50
+  return 100
+}
+
+// Place a bid on an auction with Proxy / Auto-Bid resolution
 async function placeBid(auctionId, bidderId, bidderName, amount) {
   const auction = await Auction.findById(auctionId)
 
@@ -130,7 +139,7 @@ async function placeBid(auctionId, bidderId, bidderName, amount) {
   }
 
   // Check if auction time has expired
-  if (new Date() >= auction.endTime) {
+  if (new Date() >= auction.endTime && !auction.isPermanent) {
     throw new Error('This auction has ended')
   }
 
@@ -147,12 +156,78 @@ async function placeBid(auctionId, bidderId, bidderName, amount) {
 
   // Add bid
   auction.addBid(bidderId, bidderName, amount)
+
+  // Automatic Proxy Bidding Execution:
+  // If there are other users with active autoBids higher than the new current price,
+  // the highest auto-bidder will counter-bid by min increment (up to their maxBid).
+  if (auction.autoBids && auction.autoBids.length > 0) {
+    const eligibleAutoBids = auction.autoBids
+      .filter(ab => ab.bidderId.toString() !== bidderId.toString() && ab.maxBid > auction.currentPrice)
+      .sort((a, b) => b.maxBid - a.maxBid)
+
+    if (eligibleAutoBids.length > 0) {
+      const topAuto = eligibleAutoBids[0]
+      const increment = calculateMinimumIncrement(auction.currentPrice)
+      const counterAmount = Math.min(topAuto.maxBid, auction.currentPrice + increment)
+
+      if (counterAmount > auction.currentPrice) {
+        auction.addBid(topAuto.bidderId, topAuto.bidderName, counterAmount)
+      }
+    }
+  }
+
   await auction.save()
 
   return {
     auction,
     previousHighestBid,
   }
+}
+
+// Set or update an Auto-Bid (Proxy Bid) for a user
+async function setAutoBid(auctionId, bidderId, bidderName, maxBid) {
+  const auction = await Auction.findById(auctionId)
+  if (!auction) throw new Error('Auction not found')
+
+  if (auction.status !== 'active' || (new Date() >= auction.endTime && !auction.isPermanent)) {
+    throw new Error('This auction has ended')
+  }
+
+  if (maxBid <= auction.currentPrice) {
+    throw new Error('Max auto-bid must be higher than current price of ' + auction.currentPrice)
+  }
+
+  if (!auction.autoBids) {
+    auction.autoBids = []
+  }
+
+  const existingIdx = auction.autoBids.findIndex(
+    ab => ab.bidderId.toString() === bidderId.toString()
+  )
+
+  if (existingIdx !== -1) {
+    auction.autoBids[existingIdx].maxBid = maxBid
+    auction.autoBids[existingIdx].bidderName = bidderName
+  } else {
+    auction.autoBids.push({
+      bidderId,
+      bidderName,
+      maxBid,
+      createdAt: new Date(),
+    })
+  }
+
+  const highestBid = auction.getHighestBid()
+  if (!highestBid || highestBid.bidderId.toString() !== bidderId.toString()) {
+    const increment = calculateMinimumIncrement(auction.currentPrice)
+    const initialBid = Math.min(maxBid, auction.currentPrice + increment)
+    if (initialBid > auction.currentPrice) {
+      auction.addBid(bidderId, bidderName, initialBid)
+    }
+  }
+
+  await auction.save()
+  return auction
 }
 
 // Remove a bid from an auction
@@ -214,6 +289,8 @@ module.exports = {
   updateAuction,
   deleteAuction,
   placeBid,
+  setAutoBid,
+  calculateMinimumIncrement,
   removeBid,
   getAuctionsBySeller,
   endExpiredAuctions,
