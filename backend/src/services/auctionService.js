@@ -6,6 +6,7 @@ async function createAuction(auctionData, seller) {
   const endTime = new Date(Date.now() + durationHours * 60 * 60 * 1000)
 
   const auction = await Auction.create({
+    tenantId: auctionData.tenantId,
     title: auctionData.title,
     description: auctionData.description,
     category: auctionData.category,
@@ -26,7 +27,7 @@ async function createAuction(auctionData, seller) {
 
 // Get auctions with filtering
 async function getAuctions(filters = {}) {
-  const query = {}
+  const query = filters.tenantId ? { tenantId: filters.tenantId } : {}
 
   // Category filter
   if (filters.category && filters.category !== 'all') {

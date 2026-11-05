@@ -4,6 +4,7 @@ const path = require('path')
 const helmet = require('helmet')
 
 const app = express()
+const { tenantContext } = require('./middleware/tenant')
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -35,7 +36,7 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-tenant-subdomain'],
   })
 )
 
@@ -48,7 +49,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// Apply tenant context to API routes
+app.use('/api', tenantContext)
+
 app.use('/api/auth', require('./routes/auth'))
+app.use('/api/tenants', require('./routes/tenants'))
 app.use('/api/users', require('./routes/users'))
 app.use('/api/auctions', require('./routes/auctions'))
 app.use('/api/admin', require('./routes/admin'))
@@ -111,3 +116,4 @@ app.use((err, req, res, next) => {
 })
 
 module.exports = app
+

@@ -8,6 +8,7 @@ const {
   updateProfile,
 } = require('../controllers/authController')
 const { protect } = require('../middleware/auth')
+const { checkUserLimit } = require('../middleware/planEnforcement')
 
 // Validation middleware
 function validate(req, res, next) {
@@ -27,6 +28,7 @@ function validate(req, res, next) {
 // @access  Public
 router.post(
   '/register',
+  checkUserLimit,
   [
     body('username')
       .trim()

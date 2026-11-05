@@ -12,6 +12,10 @@ import Register from './components/Register.jsx'
 import BiddingPolicy from './components/BiddingPolicy.jsx'
 import ContactSupport from './components/ContactSupport.jsx'
 import Admin from './components/Admin.jsx'
+import SuperAdmin from './components/SuperAdmin.jsx'
+import PricingPlans from './components/PricingPlans.jsx'
+import BusinessOnboarding from './components/BusinessOnboarding.jsx'
+import TenantDashboard from './components/TenantDashboard.jsx'
 import AdminGuide from './components/AdminGuide.jsx'
 import AuctioneerDashboard from './components/AuctioneerDashboard.jsx'
 import SellerApproval from './components/SellerApproval.jsx'
@@ -151,6 +155,14 @@ function AppContent() {
             <Admin currentUser={user} users={users} auctions={auctions} commissionRate={commissionRate} />
           } />
 
+          <Route path="/superadmin" element={
+            <SuperAdmin currentUser={user} />
+          } />
+
+          <Route path="/pricing" element={<PricingPlans />} />
+          <Route path="/business/signup" element={<BusinessOnboarding />} />
+          <Route path="/tenant-dashboard" element={<TenantDashboard currentUser={user} />} />
+
           <Route path="/profile" element={
             <UserProfile user={user} auctions={auctions} onUpdateUser={handleUpdateUser} users={users} />
           } />
@@ -187,3 +199,4 @@ function App() {
 }
 
 export default App
+

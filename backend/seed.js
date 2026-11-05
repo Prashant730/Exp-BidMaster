@@ -3,6 +3,7 @@ const mongoose = require('mongoose')
 const User = require('./src/models/User')
 const Auction = require('./src/models/Auction')
 const Settings = require('./src/models/Settings')
+const Tenant = require('./src/models/Tenant')
 
 async function seedDatabase() {
   try {
@@ -15,6 +16,40 @@ async function seedDatabase() {
     await User.deleteMany({})
     await Auction.deleteMany({})
     await Settings.deleteMany({})
+    await Tenant.deleteMany({})
+
+    // Create tenants
+    console.log('Creating tenants...')
+    const defaultTenant = await Tenant.create({
+      name: 'BidMaster Global',
+      subdomain: 'default',
+      status: 'active',
+      settings: {
+        primaryColor: '#c3a372',
+        secondaryColor: '#1a1918',
+      },
+    })
+
+    const sampleTenant = await Tenant.create({
+      name: 'Art & Collectibles Hub',
+      subdomain: 'arthub',
+      status: 'active',
+      settings: {
+        primaryColor: '#6366f1',
+        secondaryColor: '#0f172a',
+      },
+    })
+
+    // Create superadmin user
+    console.log('Creating superadmin user...')
+    await User.create({
+      username: 'superadmin',
+      email: 'superadmin@bidmaster.com',
+      password: 'admin123',
+      role: 'superadmin',
+      isAdmin: true,
+      name: 'Platform SuperAdmin',
+    })
 
     // Create admin user
     console.log('Creating admin user...')
@@ -555,7 +590,10 @@ async function seedDatabase() {
     console.log('\n✅ Database seeded successfully!')
     console.log('\n📝 Test Accounts:')
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━')
-    console.log('Admin:')
+    console.log('SuperAdmin:')
+    console.log('  Email: superadmin@bidmaster.com')
+    console.log('  Password: admin123')
+    console.log('\nAdmin:')
     console.log('  Email: admin@auction.com')
     console.log('  Password: admin123')
     console.log('\nSellers:')

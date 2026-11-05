@@ -19,12 +19,31 @@ const api = axios.create({
   },
 })
 
-// Function to add authentication token to requests
+// Function to add authentication token and tenant context to requests
 function addTokenToRequest(config) {
   const token = localStorage.getItem('token')
   if (token) {
     config.headers.Authorization = 'Bearer ' + token
   }
+
+  // Tenant auto-detection (subdomain or dev override)
+  let subdomain = localStorage.getItem('mockTenant')
+  if (!subdomain && typeof window !== 'undefined' && window.location.hostname) {
+    const isIP = /^(\d{1,3}\.){3}\d{1,3}$/.test(window.location.hostname)
+    if (!isIP && window.location.hostname !== 'localhost') {
+      const parts = window.location.hostname.split('.')
+      if (parts.length >= 3 && parts[0] !== 'www') {
+        subdomain = parts[0]
+      } else if (parts.length === 2 && parts[1] === 'localhost' && parts[0] !== 'www') {
+        subdomain = parts[0]
+      }
+    }
+  }
+
+  if (subdomain) {
+    config.headers['x-tenant-subdomain'] = subdomain
+  }
+
   return config
 }
 
@@ -210,4 +229,19 @@ export const contactAPI = {
   },
 }
 
+export const tenantAPI = {
+  getAll: () => api.get('/tenants'),
+  getPublic: (subdomain) => api.get(`/tenants/public/${subdomain}`),
+  create: (data) => api.post('/tenants', data),
+  update: (id, data) => api.put(`/tenants/${id}`, data),
+  delete: (id) => api.delete(`/tenants/${id}`),
+  // SaaS Onboarding & Plan routes
+  onboard: (data) => api.post('/tenants/onboard', data),
+  getPlans: () => api.get('/tenants/plans'),
+  getDashboard: (params) => api.get('/tenants/current/dashboard', { params }),
+  updatePlan: (newPlan) => api.post('/tenants/current/plan', { newPlan }),
+  updateSettings: (settings) => api.put('/tenants/current/settings', settings),
+}
+
 export default api
+

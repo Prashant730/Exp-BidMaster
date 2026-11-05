@@ -27,6 +27,11 @@ const bidSchema = new mongoose.Schema(
 
 const auctionSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
+    },
     title: {
       type: String,
       required: [true, 'Title is required'],
@@ -95,6 +100,7 @@ const auctionSchema = new mongoose.Schema(
 )
 
 // Indexes for faster queries
+auctionSchema.index({ tenantId: 1, status: 1 })
 auctionSchema.index({ category: 1 })
 auctionSchema.index({ status: 1 })
 auctionSchema.index({ endTime: 1 })

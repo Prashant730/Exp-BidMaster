@@ -32,6 +32,14 @@ function Header(props) {
             >
               Live Auctions
             </Link>
+            <Link
+              to="/pricing"
+              className={`font-medium transition-colors duration-200 ${
+                location.pathname === '/pricing' ? 'text-[#c3a372]' : 'text-gray-600 dark:text-gray-200 hover:text-[#c3a372]'
+              }`}
+            >
+              Pricing & Plans
+            </Link>
 				{(!user || !user.isAdmin) && (
 					<>
 						<Link
@@ -93,6 +101,15 @@ function Header(props) {
 								<div className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 border-b border-gray-100 dark:border-slate-700">Signed in as <span className="font-medium">{user.name}</span></div>
               {user.isAdmin && (
 								<Link
+									to="/tenant-dashboard"
+									onClick={() => setIsUserMenuOpen(false)}
+									className="block px-4 py-2 text-sm text-[#c3a372] hover:bg-gray-100 dark:hover:bg-slate-700 font-semibold"
+								>
+									🏢 Tenant Dashboard
+								</Link>
+							)}
+              {user.isAdmin && (
+								<Link
 									to="/admin"
 									onClick={() => setIsUserMenuOpen(false)}
 									className="block px-4 py-2 text-sm text-gray-900 dark:text-white hover:bg-gray-100 dark:hover:bg-slate-700 font-semibold"
@@ -107,6 +124,15 @@ function Header(props) {
                   className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700"
                 >
                   Admin Guide
+                </Link>
+              )}
+              {user.role === 'superadmin' && (
+                <Link
+                  to="/superadmin"
+                  onClick={() => setIsUserMenuOpen(false)}
+                  className="block px-4 py-2 text-sm text-[#c3a372] hover:bg-gray-100 dark:hover:bg-slate-700 font-semibold"
+                >
+                  👑 SuperAdmin (SaaS)
                 </Link>
               )}
               {(user.role === 'auctioneer' || user.isAdmin) && user.isValidated && (
@@ -230,6 +256,11 @@ function Header(props) {
 												Seller Approvals
 											</Link>
 										</>
+									)}
+									{user.role === 'superadmin' && (
+										<Link to="/superadmin" className="font-medium text-base text-[#c3a372] py-2" onClick={() => setIsMenuOpen(false)}>
+											👑 SuperAdmin (SaaS)
+										</Link>
 									)}
 									{(!user.isAdmin && user.role !== 'seller' && !user.sellerStatus) && (
 										<Link to="/seller-approval" className="font-medium text-base text-black dark:text-gray-200 py-2" onClick={() => setIsMenuOpen(false)}>

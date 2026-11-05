@@ -13,6 +13,7 @@ const {
 } = require('../controllers/auctionController')
 const { protect, optionalAuth } = require('../middleware/auth')
 const { isAdmin, isSeller, isNotAdmin } = require('../middleware/roleCheck')
+const { checkAuctionLimit } = require('../middleware/planEnforcement')
 
 // Validation middleware
 function validate(req, res, next) {
@@ -49,6 +50,7 @@ router.post(
   '/',
   protect,
   isSeller,
+  checkAuctionLimit,
   [
     body('title')
       .trim()

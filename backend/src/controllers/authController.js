@@ -14,7 +14,7 @@ function generateToken(userId) {
 // @access  Public
 async function register(req, res, next) {
   try {
-    const { username, email, password, role, name } = req.body
+    const { username, email, password, role, name, tenantId } = req.body
 
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -52,7 +52,7 @@ async function register(req, res, next) {
     }
 
     // Create user
-    const user = await User.create({
+    const createData = {
       username,
       email,
       password,
@@ -61,7 +61,11 @@ async function register(req, res, next) {
       sellerStatus,
       isAdmin,
       name: name || username,
-    })
+    }
+    if (tenantId) {
+      createData.tenantId = tenantId
+    }
+    const user = await User.create(createData)
 
     // Generate token
     const token = generateToken(user._id)
@@ -104,7 +108,16 @@ async function login(req, res, next) {
     }
 
     // Find user and include password for comparison
-    const user = await User.findOne({ email }).select('+password')
+    const query = { email }
+    if (req.body.tenantId) {
+      query["$or"] = [
+        { tenantId: req.body.tenantId },
+        { tenantId: null },
+        { tenantId: { $exists: false } },
+        { role: 'superadmin' }
+      ]
+    }
+    const user = await User.findOne(query).select('+password')
 
     if (!user) {
       return res.status(401).json({

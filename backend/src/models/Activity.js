@@ -2,6 +2,11 @@ const mongoose = require('mongoose')
 
 const activitySchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
+    },
     type: {
       type: String,
       enum: [

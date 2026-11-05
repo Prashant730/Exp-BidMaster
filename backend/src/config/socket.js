@@ -20,6 +20,13 @@ function initializeSocket(server) {
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id)
 
+    // Join tenant-scoped room for multi-tenant isolation
+    socket.on('joinTenant', (data) => {
+      const tenantId = data?.tenantId || data?.subdomain || 'global'
+      socket.join('tenant_' + tenantId)
+      console.log(`Socket ${socket.id} joined tenant_${tenantId}`)
+    })
+
     // Join auction room for real-time updates
     socket.on('joinAuction', (data) => {
       socket.join('auction_' + data.auctionId)
@@ -33,24 +40,39 @@ function initializeSocket(server) {
     })
 
     // Join admin room for live activity feed
-    socket.on('joinAdminRoom', () => {
+    socket.on('joinAdminRoom', (data) => {
+      const adminRoom = data?.tenantId ? `admin_room_${data.tenantId}` : 'admin_room'
+      socket.join(adminRoom)
       socket.join('admin_room')
-      console.log('Socket ' + socket.id + ' joined admin_room')
+      console.log('Socket ' + socket.id + ' joined ' + adminRoom)
     })
 
     // Leave admin room
-    socket.on('leaveAdminRoom', () => {
+    socket.on('leaveAdminRoom', (data) => {
+      const adminRoom = data?.tenantId ? `admin_room_${data.tenantId}` : 'admin_room'
+      socket.leave(adminRoom)
       socket.leave('admin_room')
-      console.log('Socket ' + socket.id + ' left admin_room')
+      console.log('Socket ' + socket.id + ' left ' + adminRoom)
     })
 
-    // Handle bid placement from frontend - broadcast to all clients
+    // Handle bid placement from frontend
     socket.on('bidPlace', (data) => {
       console.log('Bid placed:', data)
-      // Broadcast to all clients including sender
-      io.emit('bidPlaced', data)
+      const targetRoom = data.tenantId ? `tenant_${data.tenantId}` : null
+
+      if (targetRoom) {
+        io.to(targetRoom).emit('bidPlaced', data)
+      } else {
+        io.emit('bidPlaced', data)
+      }
+
+      // Also emit to auction room
+      if (data.auctionId) {
+        io.to('auction_' + data.auctionId).emit('bidPlaced', data)
+      }
+
       // Also emit to admin room for live activity
-      io.to('admin_room').emit('newActivity', {
+      const activityPayload = {
         type: 'bid',
         message: 'Bid of $' + data.amount + ' placed',
         userName: data.bidderName,
@@ -58,37 +80,72 @@ function initializeSocket(server) {
         auctionTitle: data.auctionTitle || 'Unknown Auction',
         amount: data.amount,
         timestamp: data.timestamp || new Date(),
-      })
+        tenantId: data.tenantId,
+      }
+      io.to('admin_room').emit('newActivity', activityPayload)
+      if (data.tenantId) {
+        io.to(`admin_room_${data.tenantId}`).emit('newActivity', activityPayload)
+      }
     })
 
     // Handle broadcast bid place (alternative event name)
     socket.on('broadcastBidPlace', (data) => {
       console.log('Broadcasting bid:', data)
-      socket.broadcast.emit('bidPlaced', data)
+      const targetRoom = data.tenantId ? `tenant_${data.tenantId}` : null
+      if (targetRoom) {
+        socket.to(targetRoom).emit('bidPlaced', data)
+      } else {
+        socket.broadcast.emit('bidPlaced', data)
+      }
     })
 
     // Handle auction updates from frontend
     socket.on('auctionUpdate', (data) => {
       console.log('Auction updated:', data)
-      io.emit('auctionUpdated', data)
+      const targetRoom = data.tenantId ? `tenant_${data.tenantId}` : null
+      if (targetRoom) {
+        io.to(targetRoom).emit('auctionUpdated', data)
+      } else {
+        io.emit('auctionUpdated', data)
+      }
+      if (data.auctionId || data.id) {
+        io.to('auction_' + (data.auctionId || data.id)).emit('auctionUpdated', data)
+      }
     })
 
     socket.on('broadcastAuctionUpdate', (data) => {
-      socket.broadcast.emit('auctionUpdated', data)
+      console.log('Broadcasting auction update:', data)
+      const targetRoom = data.tenantId ? `tenant_${data.tenantId}` : null
+      if (targetRoom) {
+        socket.to(targetRoom).emit('auctionUpdated', data)
+      } else {
+        socket.broadcast.emit('auctionUpdated', data)
+      }
     })
 
     // Handle auction removal
     socket.on('auctionRemove', (data) => {
       console.log('Auction removed:', data)
-      io.emit('auctionRemoved', data)
+      const targetRoom = data.tenantId ? `tenant_${data.tenantId}` : null
+      if (targetRoom) {
+        io.to(targetRoom).emit('auctionRemoved', data)
+      } else {
+        io.emit('auctionRemoved', data)
+      }
     })
 
     // Handle auction creation
     socket.on('auctionCreate', (data) => {
       console.log('Auction created:', data)
-      io.emit('auctionCreated', data)
+      const targetRoom = data.tenantId ? `tenant_${data.tenantId}` : null
+      if (targetRoom) {
+        io.to(targetRoom).emit('auctionCreated', data)
+      } else {
+        io.emit('auctionCreated', data)
+      }
+
       // Also emit to admin room for live activity
-      io.to('admin_room').emit('newActivity', {
+      const activityPayload = {
         type: 'auction_created',
         message: 'New auction: ' + data.auction.title,
         userName: data.auction.seller,
@@ -96,66 +153,12 @@ function initializeSocket(server) {
         auctionTitle: data.auction.title,
         amount: data.auction.startingPrice,
         timestamp: new Date(),
-      })
-    })
-
-    socket.on('broadcastAuctionCreate', (data) => {
-      socket.broadcast.emit('auctionCreated', data)
-    })
-
-    // Handle auction end
-    socket.on('auctionEnd', (data) => {
-      console.log('Auction ended:', data)
-      io.emit('auctionEnded', data)
-      // Also emit to admin room for live activity
-      io.to('admin_room').emit('newActivity', {
-        type: 'auction_ended',
-        message: 'Auction ended',
-        auctionId: data.auctionId,
-        timestamp: data.endTime || new Date(),
-      })
-    })
-
-    socket.on('broadcastAuctionEnd', (data) => {
-      socket.broadcast.emit('auctionEnded', data)
-    })
-
-    // Handle user registration
-    socket.on('userRegister', (data) => {
-      console.log('User registered:', data)
-      io.emit('userRegistered', data)
-      // Also emit to admin room for live activity
-      io.to('admin_room').emit('newActivity', {
-        type: 'user_registered',
-        message: 'New user: ' + data.user.name,
-        userName: data.user.name,
-        userEmail: data.user.email,
-        timestamp: new Date(),
-      })
-    })
-
-    // Handle user updates
-    socket.on('userUpdate', (data) => {
-      console.log('User updated:', data)
-      io.emit('userUpdated', data)
-    })
-
-    // Handle user deletion
-    socket.on('userDelete', (data) => {
-      console.log('User deleted:', data)
-      io.emit('userDeleted', data)
-    })
-
-    // Handle commission rate updates
-    socket.on('commissionRateUpdate', (data) => {
-      console.log('Commission rate updated:', data)
-      io.emit('commissionRateUpdated', data)
-    })
-
-    // Handle bid update relay (for real-time sync across all clients)
-    socket.on('bidUpdate', (data) => {
-      console.log('Bid update relay:', data)
-      io.emit('bidUpdate', data)
+        tenantId: data.tenantId,
+      }
+      io.to('admin_room').emit('newActivity', activityPayload)
+      if (data.tenantId) {
+        io.to(`admin_room_${data.tenantId}`).emit('newActivity', activityPayload)
+      }
     })
 
     socket.on('disconnect', () => {
@@ -173,4 +176,7 @@ function getIO() {
   return io
 }
 
-module.exports = { initializeSocket, getIO }
+module.exports = {
+  initializeSocket,
+  getIO,
+}

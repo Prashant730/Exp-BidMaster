@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root {
+  --tenant-primary: #c3a372;
+  --tenant-secondary: #1a1918;
   --bg: #f3f3f3;
   --surface: #ffffff;
   --muted: #666666;
@@ -231,4 +233,15 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
   }
+}
+
+/* Dynamic Multi-Tenant Branding Utilities */
+.text-tenant-primary {
+  color: var(--tenant-primary, #c3a372) !important;
+}
+.bg-tenant-primary {
+  background-color: var(--tenant-primary, #c3a372) !important;
+}
+.border-tenant-primary {
+  border-color: var(--tenant-primary, #c3a372) !important;
 }

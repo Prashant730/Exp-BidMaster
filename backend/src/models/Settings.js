@@ -27,6 +27,11 @@ const announcementSchema = new mongoose.Schema({
 
 const settingsSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
+    },
     commissionRate: {
       type: Number,
       default: 0.05,

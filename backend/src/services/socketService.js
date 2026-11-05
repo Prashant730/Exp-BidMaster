@@ -1,25 +1,33 @@
 const { getIO } = require('../config/socket')
 
-// Emit bid update to all clients
+// Helper to determine tenant room
+function getTenantRoom(tenantId) {
+  return tenantId ? `tenant_${tenantId}` : null
+}
+
+// Emit bid update to all clients in auction & tenant
 function emitBidUpdate(auctionId, bidData) {
   try {
     const io = getIO()
-    io.emit('bidUpdate', {
+    const payload = {
       auctionId,
       newPrice: bidData.newPrice,
       bidderId: bidData.bidderId,
       bidderName: bidData.bidderName,
       timestamp: new Date(),
-    })
+      tenantId: bidData.tenantId,
+    }
 
-    // Also emit to auction-specific room
-    io.to('auction_' + auctionId).emit('bidUpdate', {
-      auctionId,
-      newPrice: bidData.newPrice,
-      bidderId: bidData.bidderId,
-      bidderName: bidData.bidderName,
-      timestamp: new Date(),
-    })
+    // Emit to auction-specific room
+    io.to('auction_' + auctionId).emit('bidUpdate', payload)
+
+    // Emit to tenant-scoped room
+    if (bidData.tenantId) {
+      io.to(`tenant_${bidData.tenantId}`).emit('bidUpdate', payload)
+    }
+
+    // Also global emit for backwards compatibility
+    io.emit('bidUpdate', payload)
   } catch (error) {
     console.error('Socket emit error:', error.message)
   }
@@ -35,6 +43,12 @@ function emitOutbid(auctionId, previousBidderId, newPrice, bidderName) {
       newPrice,
       bidderName,
     })
+    io.to('auction_' + auctionId).emit('outbid', {
+      auctionId,
+      previousBidderId,
+      newPrice,
+      bidderName,
+    })
   } catch (error) {
     console.error('Socket emit error:', error.message)
   }
@@ -44,6 +58,9 @@ function emitOutbid(auctionId, previousBidderId, newPrice, bidderName) {
 function emitAuctionCreated(auction) {
   try {
     const io = getIO()
+    if (auction.tenantId) {
+      io.to(`tenant_${auction.tenantId}`).emit('auctionCreated', { auction })
+    }
     io.emit('auctionCreated', { auction })
   } catch (error) {
     console.error('Socket emit error:', error.message)
@@ -54,17 +71,24 @@ function emitAuctionCreated(auction) {
 function emitAuctionUpdated(auctionId, updates) {
   try {
     const io = getIO()
-    io.emit('auctionUpdated', { auctionId, updates })
     io.to('auction_' + auctionId).emit('auctionUpdated', { auctionId, updates })
+    if (updates.tenantId) {
+      io.to(`tenant_${updates.tenantId}`).emit('auctionUpdated', { auctionId, updates })
+    }
+    io.emit('auctionUpdated', { auctionId, updates })
   } catch (error) {
     console.error('Socket emit error:', error.message)
   }
 }
 
 // Emit auction removed event
-function emitAuctionRemoved(auctionId) {
+function emitAuctionRemoved(auctionId, tenantId) {
   try {
     const io = getIO()
+    if (tenantId) {
+      io.to(`tenant_${tenantId}`).emit('auctionRemoved', { auctionId })
+    }
+    io.to('auction_' + auctionId).emit('auctionRemoved', { auctionId })
     io.emit('auctionRemoved', { auctionId })
   } catch (error) {
     console.error('Socket emit error:', error.message)
@@ -75,18 +99,19 @@ function emitAuctionRemoved(auctionId) {
 function emitAuctionEnded(auction) {
   try {
     const io = getIO()
-    io.emit('auctionEnded', {
+    const payload = {
       auctionId: auction._id,
       winnerId: auction.winnerId,
       winnerName: auction.winnerName,
       finalPrice: auction.currentPrice,
-    })
-    io.to('auction_' + auction._id).emit('auctionEnded', {
-      auctionId: auction._id,
-      winnerId: auction.winnerId,
-      winnerName: auction.winnerName,
-      finalPrice: auction.currentPrice,
-    })
+      tenantId: auction.tenantId,
+    }
+
+    io.to('auction_' + auction._id).emit('auctionEnded', payload)
+    if (auction.tenantId) {
+      io.to(`tenant_${auction.tenantId}`).emit('auctionEnded', payload)
+    }
+    io.emit('auctionEnded', payload)
   } catch (error) {
     console.error('Socket emit error:', error.message)
   }
@@ -102,23 +127,14 @@ function emitUserUpdated(userEmail, updates) {
   }
 }
 
-// Emit commission rate updated event
-function emitCommissionRateUpdated(commissionRate) {
-  try {
-    const io = getIO()
-    io.emit('commissionRateUpdated', { commissionRate })
-  } catch (error) {
-    console.error('Socket emit error:', error.message)
-  }
-}
-
-// Emit activity event to admin clients
+// Emit activity notification (e.g. for admin dashboards)
 function emitActivity(activity) {
   try {
     const io = getIO()
-    io.emit('newActivity', activity)
-    // Also emit to admin room if implemented
     io.to('admin_room').emit('newActivity', activity)
+    if (activity.tenantId) {
+      io.to(`admin_room_${activity.tenantId}`).emit('newActivity', activity)
+    }
   } catch (error) {
     console.error('Socket emit error:', error.message)
   }
@@ -132,6 +148,5 @@ module.exports = {
   emitAuctionRemoved,
   emitAuctionEnded,
   emitUserUpdated,
-  emitCommissionRateUpdated,
   emitActivity,
 }

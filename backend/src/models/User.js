@@ -27,8 +27,13 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['bidder', 'seller', 'admin'],
+      enum: ['bidder', 'seller', 'admin', 'superadmin'],
       default: 'bidder',
+    },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      default: null,
     },
     isValidated: {
       type: Boolean,
@@ -131,6 +136,7 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 userSchema.methods.toPublicJSON = function () {
   return {
     _id: this._id,
+    tenantId: this.tenantId,
     username: this.username,
     email: this.email,
     role: this.role,
